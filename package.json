@@ -12,7 +12,8 @@
                      "redis": "*",
                      "forever": "*",
                      "nomnom": "*",
-                     "zenircbot-api": "~2"},
+                     "zenircbot-api": "~2",
+                     "node-hue-api": "*"},
     "devDependencies": {"nodeunit": "*"},
     "optionalDependencies": {"googleweather": "*"},
     "engines": {

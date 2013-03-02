@@ -2,9 +2,8 @@ var ZenIRCBot = require('zenircbot-api').ZenIRCBot
 var zen = new ZenIRCBot()
 var sub = zen.get_redis_client()
 var sourceUrl = 'https://github.com/bschlief/zenircbot'
-var hue = require('hue-module');
-var hueConfig = require('./hue.json');
-hue.load(hueConfig.ip_address, hueConfig.id_key);
+var fs = require('fs');
+var hue = require('node-hue-api').hue;
 
 zen.register_commands(
     'hue.js',
@@ -22,8 +21,11 @@ zen.register_commands(
             name: 'green',
             description: 'turns lights green'
         }, {
-            name: 'blue',
-            description: 'turns lights blue'
+            name: 'register',
+            description: 'register'
+        }, {
+            name: 'locate-bridges',
+            description: 'locates bridges and displays them'
         }
     ]
 )
@@ -31,56 +33,78 @@ zen.register_commands(
 
 sub.subscribe('in')
 sub.on('message', function(channel, message){
-    var msg = JSON.parse(message)
-    if (msg.version == 1) {
-        if (msg.type == 'privmsg') {
-            if (/light-on/i.test(msg.data.message)) {
-              hue.lights(function(lights){
-                for(i in lights) {
-                  if(lights.hasOwnProperty(i)) {
-                    zen.send_privmsg(msg.data.channel, msg.data.sender + ": turning on a light");
-                    hue.change(lights[i].set( {
-                      "on": true, 
-                      "rgb":[255,255,255]
-                    }));
-                  }
-                }
-              });
-              zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a light sentence")
-            }
-            else if (/light-off/i.test(msg.data.message)) {
-              hue.lights(function(lights){
-                for(i in lights) {
-                  if(lights.hasOwnProperty(i)) {
-                    zen.send_privmsg(msg.data.channel, msg.data.sender + ": turning off a light");
-                    console.log(hue.change(lights[i].set({"on": false, "rgb":[0,255,255]})));
-                  }
-                }
-              });
-              zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a light sentence")
-            }
-            else if (/red/i.test(msg.data.message)) {
-                zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a red sentence")
-            }
-            else if (/green/i.test(msg.data.message)) {
-                zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a green sentence")
-            }
-            else if (/blue/i.test(msg.data.message)) {
-                zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a blue sentence")
-            }
-        } else if (msg.type == 'directed_privmsg') {
-            var who = ['whoareyou', 'who are you?', 'source']
-            if (/^ping$/i.test(msg.data.message)) {
-                zen.send_privmsg(msg.data.channel, msg.data.sender + ': pong!')
-            } else if (who.indexOf(msg.data.message) != -1) {
-                zen.redis.get('zenircbot:nick', function(err, nick) {
-                    zen.send_privmsg(msg.data.channel,
-                                     'I am ' + nick + ', an instance of ' +
-                                     'ZenIRCBot. My source can be found ' +
-                                     'here: ' + sourceUrl
-                    )
-                })
-            }
+  var msg = JSON.parse(message);
+
+  var displayResult = function(result) {
+    zen.send_privmsg(msg.data.channel, 
+      msg.data.sender + ": result = " + JSON.stringify(result, null, 2));
+  }
+
+  var displayError = function(result) {
+    zen.send_privmsg(msg.data.channel, 
+      msg.data.sender + ": error = " + JSON.stringify(result, null, 2));
+  }
+
+  var storeUsernameAndDisplayResult = function(result) {
+    var hue_config = require('./hue.json');
+    hue_config.username = result;
+    zen.send_privmsg(msg.data.channel, msg.data.sender + ": storing result in ./hue.json at key username");
+    fs.writeFile('./hue.json', JSON.stringify(hue_config, null, 4), function(err) {
+      if(err) {
+        console.log("Error writing hue.json:" + err);
+      }
+    }); 
+    displayResult(result);
+  }
+
+  if (msg.version == 1) {
+    if (msg.type == 'privmsg') {
+      if (/locate-bridges/i.test(msg.data.message)) {
+        zen.send_privmsg(msg.data.channel, msg.data.sender + ": locating hue bridges...");
+        hue.locateBridges().then(function(bridge) {
+          zen.send_privmsg(msg.data.channel, msg.data.sender + ": your bridges found are as follows -- "+ JSON.stringify(bridge));
+        }).done();
+      }
+      else if (/register/i.test(msg.data.message)) {
+        var hue_config = require('./hue.json');
+
+        if (hue_config.username) {
+          zen.send_privmsg(msg.data.channel, msg.data.sender + ": user already exists in hue.json");
+          displayResult(hue_config.username);
+        }
+        else {
+          zen.send_privmsg(msg.data.channel, msg.data.sender + ": registering user");
+          hue.registerUser(hue_config.hostname, hue_config.newUserName, hue_config.userDescription)
+            .then(storeUsernameAndDisplayResult)
+            .fail(displayError)
+            .done();
+        }
+      }
+      else if (/light-off/i.test(msg.data.message)) {
+        zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a light sentence")
+      }
+      else if (/red/i.test(msg.data.message)) {
+        zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a red sentence")
+      }
+      else if (/green/i.test(msg.data.message)) {
+        zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a green sentence")
+      }
+      else if (/blue/i.test(msg.data.message)) {
+        zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a blue sentence")
+      }
+    } else if (msg.type == 'directed_privmsg') {
+      var who = ['whoareyou', 'who are you?', 'source']
+        if (/^ping$/i.test(msg.data.message)) {
+          zen.send_privmsg(msg.data.channel, msg.data.sender + ': pong!')
+        } else if (who.indexOf(msg.data.message) != -1) {
+          zen.redis.get('zenircbot:nick', function(err, nick) {
+            zen.send_privmsg(msg.data.channel,
+              'I am ' + nick + ', an instance of ' +
+              'ZenIRCBot. My source can be found ' +
+              'here: ' + sourceUrl
+              )
+          })
         }
     }
+  }
 })
