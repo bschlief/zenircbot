@@ -3,13 +3,18 @@ var zen = new ZenIRCBot()
 var sub = zen.get_redis_client()
 var sourceUrl = 'https://github.com/bschlief/zenircbot'
 var hue = require('hue-module');
+var hueConfig = require('./hue.json');
+hue.load(hueConfig.ip_address, hueConfig.id_key);
 
 zen.register_commands(
     'hue.js',
     [
         {
-            name: 'light',
+            name: 'light-on',
             description: 'turns on lights'
+        }, {
+            name: 'light-off',
+            description: 'turns off lights'
         }, {
             name: 'red',
             description: 'turns lights red'
@@ -23,17 +28,36 @@ zen.register_commands(
     ]
 )
 
-hueConfig = require('./hue.json');
-//hue.load(hueConfig.ip_address, hueConfig.id_key);
-hue.load("192.168.1.135", "73f8558a0ef4603c04596624558a63bc");
 
 sub.subscribe('in')
 sub.on('message', function(channel, message){
     var msg = JSON.parse(message)
     if (msg.version == 1) {
         if (msg.type == 'privmsg') {
-            if (/light/i.test(msg.data.message)) {
-                zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a light sentence")
+            if (/light-on/i.test(msg.data.message)) {
+              hue.lights(function(lights){
+                for(i in lights) {
+                  if(lights.hasOwnProperty(i)) {
+                    zen.send_privmsg(msg.data.channel, msg.data.sender + ": turning on a light");
+                    hue.change(lights[i].set( {
+                      "on": true, 
+                      "rgb":[255,255,255]
+                    }));
+                  }
+                }
+              });
+              zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a light sentence")
+            }
+            else if (/light-off/i.test(msg.data.message)) {
+              hue.lights(function(lights){
+                for(i in lights) {
+                  if(lights.hasOwnProperty(i)) {
+                    zen.send_privmsg(msg.data.channel, msg.data.sender + ": turning off a light");
+                    console.log(hue.change(lights[i].set({"on": false, "rgb":[0,255,255]})));
+                  }
+                }
+              });
+              zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a light sentence")
             }
             else if (/red/i.test(msg.data.message)) {
                 zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a red sentence")
