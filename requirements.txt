@@ -3,3 +3,4 @@ gevent
 redis
 argparse
 zenircbot_api
+hue-module

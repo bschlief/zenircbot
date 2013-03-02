@@ -1,6 +1,3 @@
 [submodule "clojurebot"]
 	path = clojurebot
 	url = https://github.com/wraithan/zenircbot-clojure.git
-[submodule "services/hue-module"]
-	path = services/hue-module
-	url = git://github.com/whyohwhyamihere/hue-module.git
