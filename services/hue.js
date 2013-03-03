@@ -4,32 +4,31 @@ var sub = zen.get_redis_client()
 var sourceUrl = 'https://github.com/bschlief/zenircbot'
 var fs = require('fs');
 var hue = require('node-hue-api').hue;
+var lightState = require('node-hue-api').lightState;
+var hueConfig = require('./hue.json');
+
 
 zen.register_commands(
     'hue.js',
     [
         {
-            name: 'light-on',
-            description: 'turns on lights'
+            name: 'hue on',
+            description: 'turn on the lights'
         }, {
-            name: 'light-off',
-            description: 'turns off lights'
+            name: 'hue off',
+            description: 'turn off the lights'
         }, {
-            name: 'red',
-            description: 'turns lights red'
-        }, {
-            name: 'green',
-            description: 'turns lights green'
-        }, {
-            name: 'register',
+            name: 'hue register',
             description: 'register'
         }, {
-            name: 'locate-bridges',
+            name: 'hue locateBridges',
             description: 'locates bridges and displays them'
+        }, {
+            name: 'hue apply [1, 2, 3] lightState.create().on.white(200,50)',
+            description: 'an example of how to apply a random setting to all 3 lights'
         }
     ]
 )
-
 
 sub.subscribe('in')
 sub.on('message', function(channel, message){
@@ -45,9 +44,15 @@ sub.on('message', function(channel, message){
       msg.data.sender + ": error = " + JSON.stringify(result, null, 2));
   }
 
+  var api;
+  if(hueConfig.username) {
+    api = new hue.HueApi(hueConfig.hostname, hueConfig.username);
+  } else {
+    zen.send_privmsg(msg.data.channel, "Need to run the register command");
+  }
+
   var storeUsernameAndDisplayResult = function(result) {
-    var hue_config = require('./hue.json');
-    hue_config.username = result;
+    hueConfig.username = result;
     zen.send_privmsg(msg.data.channel, msg.data.sender + ": storing result in ./hue.json at key username");
     fs.writeFile('./hue.json', JSON.stringify(hue_config, null, 4), function(err) {
       if(err) {
@@ -57,12 +62,23 @@ sub.on('message', function(channel, message){
     displayResult(result);
   }
 
+  var applyLightState = function(api, lightArray, state){
+    for (i in lightArray) {
+      api.setLightState(lightArray[i], state)
+        .then(displayResult)
+        .fail(displayError)
+        .done();
+    }
+  }
+
+  var ack = function() { zen.send_privmsg(msg.data.channel, msg.data.sender + ":Acknowledged!"); }
+
   if (msg.version == 1) {
-    if (msg.type == 'privmsg') {
-      if (/locate-bridges/i.test(msg.data.message)) {
+    if (msg.type == 'privmsg' && /hue/.test(msg.data.message)) {
+      if (/locateBridges/i.test(msg.data.message)) {
         zen.send_privmsg(msg.data.channel, msg.data.sender + ": locating hue bridges...");
         hue.locateBridges().then(function(bridge) {
-          zen.send_privmsg(msg.data.channel, msg.data.sender + ": your bridges found are as follows -- "+ JSON.stringify(bridge));
+          zen.send_privmsg(msg.data.channel, msg.data.sender + ": bridges found -- "+ JSON.stringify(bridge));
         }).done();
       }
       else if (/register/i.test(msg.data.message)) {
@@ -78,19 +94,31 @@ sub.on('message', function(channel, message){
             .then(storeUsernameAndDisplayResult)
             .fail(displayError)
             .done();
+          api = new hue.HueApi(hueConfig.hostname, hueConfig.username);
         }
       }
-      else if (/light-off/i.test(msg.data.message)) {
-        zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a light sentence")
+      else if (/apply/i.test(msg.data.message)) {
+        var apply_idx = msg.data.message.search('hue apply ') + 'hue apply '.length;
+        var application_string = msg.data.message.substr(apply_idx);
+        zen.send_privmsg(msg.data.channel, msg.data.sender + ": applying: " + application_string);
+        var state = eval(application_string);
+
+        applyLightState(api, [1, 2, 3], state);
       }
-      else if (/red/i.test(msg.data.message)) {
-        zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a red sentence")
+      else if (/on/i.test(msg.data.message)) {
+        ack();
+
+        // Set light state to 'on' with warm white value of 400 and brightness set to 100%
+        var state = lightState.create().on();
+
+        applyLightState(api, [1, 2, 3], state);
       }
-      else if (/green/i.test(msg.data.message)) {
-        zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a green sentence")
-      }
-      else if (/blue/i.test(msg.data.message)) {
-        zen.send_privmsg(msg.data.channel, msg.data.sender + ": this is a blue sentence")
+      else if (/off/i.test(msg.data.message)) {
+        ack();
+
+        state = lightState.create().off();
+
+        applyLightState(api, [1, 2, 3], state);
       }
     } else if (msg.type == 'directed_privmsg') {
       var who = ['whoareyou', 'who are you?', 'source']
