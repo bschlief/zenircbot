@@ -89,6 +89,20 @@ sub.on('message', function(channel, message){
     return transitionTime;
   }
 
+  var getLightArray = function(str) {
+    lightArray = []; 
+    arrayMatch= str.match(/array=\((\d+(,\d+)*)\)/);
+    if (!arrayMatch) {
+      return [1, 2, 3];
+    }
+    arrayString = arrayMatch[1];
+    iterable = arrayString.replace("(","").replace(")","").split(",");
+    for (i in iterable) {
+      lightArray.push(iterable[i.valueOf()]);
+    }
+    return lightArray;
+  }
+
   if (msg.version == 1) {
     if (msg.type == 'privmsg' && /hue/.test(msg.data.message)) {
       if (/locateBridges/i.test(msg.data.message)) {
@@ -120,30 +134,40 @@ sub.on('message', function(channel, message){
       else if (/hsl=/.test(msg.data.message)) {
         hslMatch = msg.data.message.match(/hsl=\((\d+),(\d+),(\d+)\)/);
         transitionTime = getTransitionTime(msg.data.message);
-        applyLightState(api,lightState.create().hsl(hslMatch[1], hslMatch[2], hslMatch[3]).transition(transitionTime));
+        lightArray = getLightArray(msg.data.message);
+        applyLightState(api,
+                        lightState.create().hsl(hslMatch[1], hslMatch[2], hslMatch[3]).transition(transitionTime),
+                        lightArray);
       }
       else if (/rgb=/.test(msg.data.message)) {
         rgbMatch = msg.data.message.match(/rgb=\((\d+),(\d+),(\d+)\)/);
         transitionTime = getTransitionTime(msg.data.message);
-        applyLightState(api,lightState.create().rgb(rgbMatch[1], rgbMatch[2], rgbMatch[3]).transition(transitionTime));
+        lightArray = getLightArray(msg.data.message);
+        applyLightState(api,
+                        lightState.create().rgb(rgbMatch[1], rgbMatch[2], rgbMatch[3]).transition(transitionTime),
+                        lightArray);
       }
       else if (/brightness=/.test(msg.data.message)) {
         brightnessMatch = msg.data.message.match(/brightness=(\d+)/);
         transitionTime = getTransitionTime(msg.data.message);
-        applyLightState(api,lightState.create().brightness(brightnessMatch[1]).transition(transitionTime));
+        lightArray = getLightArray(msg.data.message);
+        applyLightState(api,lightState.create().brightness(brightnessMatch[1]).transition(transitionTime),lightArray);
       }
       else if (/white=/.test(msg.data.message)) {
         whiteMatch = msg.data.message.match(/white=\((\d+),(\d+)\)/);
         transitionTime = getTransitionTime(msg.data.message);
-        applyLightState(api,lightState.create().white(whiteMatch[1],whiteMatch[2]).transition(transitionTime));
+        lightArray = getLightArray(msg.data.message);
+        applyLightState(api,lightState.create().white(whiteMatch[1],whiteMatch[2]).transition(transitionTime),lightArray);
       }
       else if (/on/i.test(msg.data.message)) {
         var state = lightState.create().on();
-        applyLightState(api, state);
+        lightArray = getLightArray(msg.data.message);
+        applyLightState(api, state, lightArray);
       }
       else if (/off/i.test(msg.data.message)) {
         var state = lightState.create().off();
-        applyLightState(api, state);
+        lightArray = getLightArray(msg.data.message);
+        applyLightState(api, state, lightArray);
       }
     } else if (msg.type == 'directed_privmsg') {
       var who = ['whoareyou', 'who are you?', 'source']
