@@ -6,7 +6,8 @@ var fs = require('fs');
 var hue = require('node-hue-api').hue;
 var lightState = require('node-hue-api').lightState;
 var hueConfig = require('./hue.json');
-
+var registerWarningIssued = false;
+var api = null;
 
 zen.register_commands(
     'hue.js',
@@ -37,6 +38,11 @@ sub.subscribe('in')
 sub.on('message', function(channel, message){
   var msg = JSON.parse(message);
 
+
+  var displayResultConsole = function(result) { 
+    console.log("result = " + JSON.stringify(result,null,2));  
+  }
+
   var displayResult = function(result) {
     zen.send_privmsg(msg.data.channel, 
       msg.data.sender + ": result = " + JSON.stringify(result, null, 2));
@@ -45,6 +51,10 @@ sub.on('message', function(channel, message){
   var displayError = function(result) {
     zen.send_privmsg(msg.data.channel, 
       msg.data.sender + ": error = " + JSON.stringify(result, null, 2));
+  }
+
+  var getDefaultLightArray = function() {
+    return [1, 2, 3]; 
   }
 
   var storeHueConfig = function(config) {
@@ -61,22 +71,42 @@ sub.on('message', function(channel, message){
     storeHueConfig(hueConfig);
   }
 
-  var applyLightState = function(api, state, lightArray){
-    lightArray = lightArray || [1, 2, 3];
+  var getLightArrayFromMessage = function(str) {
+    var lightArray = []; 
+    var arrayMatch = str.match(/array=\((\d+(,\d+)*)\)/);
+    if (!arrayMatch) {
+      return [1, 2, 3];
+    }
+    var arrayString = arrayMatch[1];
+    var iterable = arrayString.replace("(","").replace(")","").split(",");
+    for (var i = 0; i<iterable.length; i++) {
+      lightArray.push(iterable[i.valueOf()]);
+    }
+    return lightArray;
+  }
 
-    for (i in lightArray) {
+  var applyLightState = function(state, message){
+    var lightArray = getLightArrayFromMessage(message);
+    if (!lightArray) 
+    {
+      lightArray = getDefaultLightArray();
+    }
+
+    for (var i=0; i<lightArray.length; i++) {
       api.setLightState(lightArray[i], state)
-        .then(displayResult)
+        .then(displayResultConsole)
         .fail(displayError)
         .done();
     }
   }
   
-  var api;
   if(hueConfig.username) {
     api = new hue.HueApi(hueConfig.hostname, hueConfig.username);
   } else {
-    zen.send_privmsg(msg.data.channel, "hue.js disabled. press connect button then type 'hue register' in the irc window");
+    if (!registerWarningIssued) {    
+      zen.send_privmsg(msg.data.channel, "hue.js disabled. press connect button then type 'hue register' in the irc window");
+    }
+    registerWarningIssued = true;
   }
 
   var getTransitionTime = function(str) {
@@ -87,20 +117,6 @@ sub.on('message', function(channel, message){
       transitionTime = transitionMatch[1];
     }
     return transitionTime;
-  }
-
-  var getLightArray = function(str) {
-    lightArray = []; 
-    arrayMatch= str.match(/array=\((\d+(,\d+)*)\)/);
-    if (!arrayMatch) {
-      return [1, 2, 3];
-    }
-    arrayString = arrayMatch[1];
-    iterable = arrayString.replace("(","").replace(")","").split(",");
-    for (i in iterable) {
-      lightArray.push(iterable[i.valueOf()]);
-    }
-    return lightArray;
   }
 
   if (msg.version == 1) {
@@ -132,42 +148,32 @@ sub.on('message', function(channel, message){
         }
       }
       else if (/hsl=/.test(msg.data.message)) {
-        hslMatch = msg.data.message.match(/hsl=\((\d+),(\d+),(\d+)\)/);
-        transitionTime = getTransitionTime(msg.data.message);
-        lightArray = getLightArray(msg.data.message);
-        applyLightState(api,
-                        lightState.create().hsl(hslMatch[1], hslMatch[2], hslMatch[3]).transition(transitionTime),
-                        lightArray);
+        var hslMatch = msg.data.message.match(/hsl=\((\d+),(\d+),(\d+)\)/);
+        var transitionTime = getTransitionTime(msg.data.message);
+        applyLightState(lightState.create().hsl(hslMatch[1], hslMatch[2], hslMatch[3]).transition(transitionTime),msg.data.message);
       }
       else if (/rgb=/.test(msg.data.message)) {
-        rgbMatch = msg.data.message.match(/rgb=\((\d+),(\d+),(\d+)\)/);
-        transitionTime = getTransitionTime(msg.data.message);
-        lightArray = getLightArray(msg.data.message);
-        applyLightState(api,
-                        lightState.create().rgb(rgbMatch[1], rgbMatch[2], rgbMatch[3]).transition(transitionTime),
-                        lightArray);
+        var rgbMatch = msg.data.message.match(/rgb=\((\d+),(\d+),(\d+)\)/);
+        var transitionTime = getTransitionTime(msg.data.message);
+        applyLightState(lightState.create().rgb(rgbMatch[1], rgbMatch[2], rgbMatch[3]).transition(transitionTime),msg.data.message);
       }
       else if (/brightness=/.test(msg.data.message)) {
-        brightnessMatch = msg.data.message.match(/brightness=(\d+)/);
-        transitionTime = getTransitionTime(msg.data.message);
-        lightArray = getLightArray(msg.data.message);
-        applyLightState(api,lightState.create().brightness(brightnessMatch[1]).transition(transitionTime),lightArray);
+        var brightnessMatch = msg.data.message.match(/brightness=(\d+)/);
+        var transitionTime = getTransitionTime(msg.data.message);
+        applyLightState(lightState.create().brightness(brightnessMatch[1]).transition(transitionTime),msg.data.message);
       }
       else if (/white=/.test(msg.data.message)) {
-        whiteMatch = msg.data.message.match(/white=\((\d+),(\d+)\)/);
-        transitionTime = getTransitionTime(msg.data.message);
-        lightArray = getLightArray(msg.data.message);
-        applyLightState(api,lightState.create().white(whiteMatch[1],whiteMatch[2]).transition(transitionTime),lightArray);
+        var whiteMatch = msg.data.message.match(/white=\((\d+),(\d+)\)/);
+        var transitionTime = getTransitionTime(msg.data.message);
+        applyLightState(lightState.create().white(whiteMatch[1],whiteMatch[2]).transition(transitionTime),msg.data.message);
       }
       else if (/on/i.test(msg.data.message)) {
         var state = lightState.create().on();
-        lightArray = getLightArray(msg.data.message);
-        applyLightState(api, state, lightArray);
+        applyLightState(state,msg.data.message);
       }
       else if (/off/i.test(msg.data.message)) {
         var state = lightState.create().off();
-        lightArray = getLightArray(msg.data.message);
-        applyLightState(api, state, lightArray);
+        applyLightState(state,msg.data.message);
       }
     } else if (msg.type == 'directed_privmsg') {
       var who = ['whoareyou', 'who are you?', 'source']
