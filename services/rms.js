@@ -27,7 +27,7 @@ sub.on('message', function(channel, message){
     if (msg.version == 1) {
         if (msg.type == 'privmsg') {
             
-            if (/rider/i.test(msg.data.message)) {
+            if (/rider/i.test(msg.data.message) || (Math.random() < 0.05) ) {
                 var rand = Math.floor(Math.random()*rider.sentences.length)
                 zen.send_privmsg(msg.data.channel, msg.data.sender + ": " + rider.sentences[rand])
             }
