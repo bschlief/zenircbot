@@ -8,3 +8,4 @@ tests/var/lib
 tests/var/log
 tests/var/run
 dump.rdb
+src
