@@ -2,5 +2,5 @@ gevent
 -e git+git://github.com/coleifer/irc.git#egg=irckit
 redis
 argparse
-zenircbot-api
+zenircbot_api
 node-hue-api

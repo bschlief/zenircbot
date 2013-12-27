@@ -1,22 +1,28 @@
 {
-    "author": "Wraithan (http://wraithan.net)",
-    "name": "zenircbot",
-    "description": "ZenIRCBot",
-    "version": "2.2.1",
-    "homepage": "http://github.com/wraithan/zenircbot",
-    "repository": {
-        "type": "git",
-        "url": "git://github.com/wraithan/zenircbot.git"
-    },
-    "dependencies": {"irc": "*",
-                     "redis": "*",
-                     "forever": "*",
-                     "nomnom": "*",
-                     "zenircbot-api": "~2",
-                     "node-hue-api": "*"},
-    "devDependencies": {"nodeunit": "*"},
-    "optionalDependencies": {"googleweather": "*"},
-    "engines": {
-        "node": "*"
-    }
+  "author": "Wraithan (http://wraithan.net)",
+  "name": "zenircbot",
+  "description": "ZenIRCBot",
+  "version": "2.2.1",
+  "homepage": "http://github.com/wraithan/zenircbot",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/wraithan/zenircbot.git"
+  },
+  "dependencies": {
+    "irc": "*",
+    "redis": "*",
+    "forever": "*",
+    "nomnom": "*",
+    "zenircbot-api": "~2.4.1",
+    "node-hue-api": "*"
+  },
+  "devDependencies": {
+    "nodeunit": "*"
+  },
+  "optionalDependencies": {
+    "googleweather": "*"
+  },
+  "engines": {
+    "node": "*"
+  }
 }
